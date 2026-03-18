@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<!--
+  Migration of index.cfm → app/templates/index.html
+
+  Original ColdFusion index.cfm:
+    - Renders a Bootstrap login form.
+    - jQuery AJAX posts to "components/Auth.cfc?method=login".
+    - On success redirects to dashboard.cfm.
+    - Client-side validation: username and password required.
+
+  Python/FastAPI equivalent:
+    - Jinja2 template rendered by app/routers/index.py (GET /).
+    - AJAX now posts to /components/auth/login  (FastAPI endpoint).
+    - On success redirects to /dashboard.
+    - flash_message variable injected by the router for server-side errors.
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+</head>
+<body class="bg-light">
+
+<div class="container mt-5">
+    <div class="card p-4 shadow">
+        <h3>Login</h3>
+
+        <!-- Server-side flash message (mirrors <cfif> error display) -->
+        {% if flash_message %}
+        <div class="alert alert-danger">{{ flash_message }}</div>
+        {% endif %}
+
+        <div id="message"></div>
+
+        <form id="loginForm" novalidate>
+            <input type="text"     id="username" name="username"
+                   class="form-control mb-3" placeholder="Username">
+            <input type="password" id="password" name="password"
+                   class="form-control mb-3" placeholder="Password">
+            <button class="btn btn-primary w-100">Login</button>
+        </form>
+    </div>
+</div>
+
+<script>
+/*
+ * Mirrors the jQuery submit handler in index.cfm.
+ * AJAX target updated from "components/Auth.cfc?method=login"
+ *                       to  "/components/auth/login"
+ */
+$("#loginForm").submit(function(e) {
+    e.preventDefault();
+
+    let username = $("#username").val().trim();
+    let password = $("#password").val().trim();
+    let errors   = [];
+
+    // Client-side validation (identical to original)
+    if (username === "") { errors.push("Username is required"); }
+    if (password === "") { errors.push("Password is required"); }
+
+    if (errors.length > 0) {
+        $("#message").html('<div class="alert alert-danger">' + errors.join("<br>") + '</div>');
+        return;
+    }
+
+    // POST to FastAPI auth router (replaces Auth.cfc?method=login)
+    $.ajax({
+        url:         "/components/auth/login",
+        type:        "POST",
+        contentType: "application/json",
+        data:        JSON.stringify({ username: username, password: password }),
+        success: function(data) {
+            if (data.success) {
+                window.location = "/dashboard";
+            } else {
+                $("#message").html('<div class="alert alert-danger">' + data.message + '</div>');
+            }
+        },
+        error: function() {
+            $("#message").html('<div class="alert alert-danger">An error occurred. Please try again.</div>');
+        }
+    });
+});
+</script>
+
+</body>
+</html>
